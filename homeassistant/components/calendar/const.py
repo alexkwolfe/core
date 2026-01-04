@@ -36,6 +36,7 @@ EVENT_LOCATION = "location"
 EVENT_RECURRENCE_ID = "recurrence_id"
 EVENT_RECURRENCE_RANGE = "recurrence_range"
 EVENT_RRULE = "rrule"
+EVENT_ATTENDEES = "attendees"
 
 # Service call fields
 EVENT_START_DATE = "start_date"
@@ -62,4 +63,5 @@ LIST_EVENT_FIELDS = {
     EVENT_SUMMARY,
     EVENT_DESCRIPTION,
     EVENT_LOCATION,
+    EVENT_ATTENDEES,
 }

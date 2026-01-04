@@ -1562,3 +1562,134 @@ async def test_birthday_entity(
     assert state
     assert state.name == "Birthdays"
     assert state.attributes.get("message") == expected_event_message
+
+
+async def test_event_with_attendees_exposed(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_events_list_items,
+    component_setup,
+) -> None:
+    """Test that attendee data is exposed in calendar events."""
+    event = {
+        **TEST_EVENT,
+        **upcoming(),
+        "attendees": [
+            {
+                "email": "attendee1@example.com",
+                "displayName": "First Attendee",
+                "responseStatus": "accepted",
+                "self": False,
+                "organizer": False,
+                "optional": False,
+            },
+            {
+                "email": "organizer@example.com",
+                "displayName": "Event Organizer",
+                "responseStatus": "needsAction",
+                "self": False,
+                "organizer": True,
+                "optional": False,
+            },
+            {
+                "email": "user@example.com",
+                "responseStatus": "accepted",
+                "self": True,
+                "organizer": False,
+                "optional": False,
+            },
+        ],
+    }
+    mock_events_list_items([event])
+    assert await component_setup()
+
+    client = await hass_client()
+    response = await client.get(upcoming_event_url())
+    assert response.status == HTTPStatus.OK
+    events = await response.json()
+    assert len(events) == 1
+
+    # Verify attendees are present and correctly formatted
+    attendees = events[0]["attendees"]
+    assert attendees is not None
+    assert len(attendees) == 3
+
+    # Check first attendee
+    assert attendees[0]["email"] == "attendee1@example.com"
+    assert attendees[0]["display_name"] == "First Attendee"
+    assert attendees[0]["response_status"] == "accepted"
+
+    # Check organizer (boolean flag included)
+    assert attendees[1]["organizer"] is True
+    assert attendees[1]["response_status"] == "needsAction"
+
+    # Check self (boolean flag included)
+    assert attendees[2]["self"] is True
+
+
+async def test_event_without_attendees(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_events_list_items,
+    component_setup,
+) -> None:
+    """Test that events without attendees have None for attendees field."""
+    event = {
+        **TEST_EVENT,
+        **upcoming(),
+        # No attendees field
+    }
+    mock_events_list_items([event])
+    assert await component_setup()
+
+    client = await hass_client()
+    response = await client.get(upcoming_event_url())
+    assert response.status == HTTPStatus.OK
+    events = await response.json()
+    assert len(events) == 1
+
+    # Attendees should be None (not present in source event)
+    assert events[0].get("attendees") is None
+
+
+async def test_event_with_optional_attendee(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_events_list_items,
+    component_setup,
+) -> None:
+    """Test that optional attendees are marked correctly."""
+    event = {
+        **TEST_EVENT,
+        **upcoming(),
+        "attendees": [
+            {
+                "email": "required@example.com",
+                "displayName": "Required Attendee",
+                "responseStatus": "accepted",
+                "optional": False,
+            },
+            {
+                "email": "optional@example.com",
+                "displayName": "Optional Attendee",
+                "responseStatus": "tentative",
+                "optional": True,
+            },
+        ],
+    }
+    mock_events_list_items([event])
+    assert await component_setup()
+
+    client = await hass_client()
+    response = await client.get(upcoming_event_url())
+    assert response.status == HTTPStatus.OK
+    events = await response.json()
+
+    attendees = events[0]["attendees"]
+    assert len(attendees) == 2
+
+    # Required attendee should NOT have "optional" key (False not included)
+    assert "optional" not in attendees[0]
+
+    # Optional attendee should have "optional": True
+    assert attendees[1]["optional"] is True

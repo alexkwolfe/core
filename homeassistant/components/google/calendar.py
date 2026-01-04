@@ -12,6 +12,7 @@ from gcal_sync.api import Range, SyncEventsRequest
 from gcal_sync.exceptions import ApiException
 from gcal_sync.model import (
     AccessRole,
+    Attendee,
     Calendar,
     DateOrDatetime,
     Event,
@@ -508,6 +509,30 @@ class GoogleCalendarEntity(
         await self.coordinator.async_refresh()
 
 
+def _convert_attendee(attendee: Attendee) -> dict[str, Any]:
+    """Convert a gcal_sync Attendee to a dictionary for CalendarEvent.
+
+    Converts the gcal_sync Attendee model to a plain dictionary suitable
+    for CalendarEvent serialization.
+    """
+    result: dict[str, Any] = {
+        "email": attendee.email,
+        "response_status": attendee.response_status.value,
+    }
+
+    # Only include optional fields if they have meaningful values
+    if attendee.display_name:
+        result["display_name"] = attendee.display_name
+    if attendee.is_self:
+        result["self"] = True
+    if attendee.organizer:
+        result["organizer"] = True
+    if attendee.optional:
+        result["optional"] = True
+
+    return result
+
+
 def _get_calendar_event(event: Event) -> CalendarEvent:
     """Return a CalendarEvent from an API event."""
     rrule: str | None = None
@@ -518,6 +543,12 @@ def _get_calendar_event(event: Event) -> CalendarEvent:
         and raw_rule.startswith(RRULE_PREFIX)
     ):
         rrule = raw_rule.removeprefix(RRULE_PREFIX)
+
+    # Convert attendees if present
+    attendees: list[dict[str, Any]] | None = None
+    if event.attendees:
+        attendees = [_convert_attendee(attendee) for attendee in event.attendees]
+
     return CalendarEvent(
         uid=event.ical_uuid,
         recurrence_id=event.id if event.recurring_event_id else None,
@@ -527,6 +558,7 @@ def _get_calendar_event(event: Event) -> CalendarEvent:
         end=event.end.value,
         description=event.description,
         location=event.location,
+        attendees=attendees,
     )
 
 

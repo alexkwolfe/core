@@ -373,6 +373,7 @@ class CalendarEvent:
     uid: str | None = None
     recurrence_id: str | None = None
     rrule: str | None = None
+    attendees: list[dict[str, Any]] | None = None
 
     @property
     def start_datetime_local(self) -> datetime.datetime:
