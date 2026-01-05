@@ -14,6 +14,9 @@
             "true": "[%key:common::state::yes%]"
           }
         },
+        "attendees": {
+          "name": "Attendees"
+        },
         "description": {
           "name": "Description"
         },

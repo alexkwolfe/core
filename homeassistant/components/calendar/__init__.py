@@ -529,7 +529,7 @@ class CalendarEntity(Entity):
         if (event := self.event) is None:
             return None
 
-        return {
+        attrs = {
             "message": event.summary,
             "all_day": event.all_day,
             "start_time": event.start_datetime_local.strftime(DATE_STR_FORMAT),
@@ -537,6 +537,11 @@ class CalendarEntity(Entity):
             "location": event.location if event.location else "",
             "description": event.description if event.description else "",
         }
+
+        if event.attendees:
+            attrs["attendees"] = event.attendees
+
+        return attrs
 
     @final
     @property
