@@ -1693,3 +1693,82 @@ async def test_event_with_optional_attendee(
 
     # Optional attendee should have "optional": True
     assert attendees[1]["optional"] is True
+
+
+async def test_create_event_with_attendees(
+    hass: HomeAssistant,
+    component_setup: ComponentSetup,
+    mock_insert_event: Callable[..., None],
+    mock_events_list: ApiResult,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test creating an event with attendees via the create_event service."""
+    mock_events_list({})
+    assert await component_setup()
+
+    aioclient_mock.clear_requests()
+    mock_insert_event(calendar_id=CALENDAR_ID)
+    mock_events_list({})  # Re-register for coordinator refresh after create
+
+    await hass.services.async_call(
+        "calendar",
+        "create_event",
+        {
+            "entity_id": TEST_ENTITY,
+            "summary": "Team Meeting",
+            "start_date_time": "2024-01-15T10:00:00",
+            "end_date_time": "2024-01-15T11:00:00",
+            "attendees": [
+                "alice@example.com",
+                "bob@example.com",
+            ],
+        },
+        blocking=True,
+    )
+
+    # First call is the POST to create event
+    assert len(aioclient_mock.mock_calls) >= 1
+    request_body = aioclient_mock.mock_calls[0][2]
+
+    # Verify attendees are included in the API request
+    assert "attendees" in request_body
+    assert len(request_body["attendees"]) == 2
+    assert request_body["attendees"][0]["email"] == "alice@example.com"
+    assert request_body["attendees"][1]["email"] == "bob@example.com"
+    # responseStatus defaults to needsAction and may not be included in the request
+    # (Google Calendar API uses needsAction as default for new attendees)
+
+
+async def test_create_event_without_attendees(
+    hass: HomeAssistant,
+    component_setup: ComponentSetup,
+    mock_insert_event: Callable[..., None],
+    mock_events_list: ApiResult,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test creating an event without attendees still works."""
+    mock_events_list({})
+    assert await component_setup()
+
+    aioclient_mock.clear_requests()
+    mock_insert_event(calendar_id=CALENDAR_ID)
+    mock_events_list({})  # Re-register for coordinator refresh after create
+
+    await hass.services.async_call(
+        "calendar",
+        "create_event",
+        {
+            "entity_id": TEST_ENTITY,
+            "summary": "Solo Event",
+            "start_date_time": "2024-01-15T10:00:00",
+            "end_date_time": "2024-01-15T11:00:00",
+        },
+        blocking=True,
+    )
+
+    # First call is the POST to create event
+    assert len(aioclient_mock.mock_calls) >= 1
+    request_body = aioclient_mock.mock_calls[0][2]
+
+    # Verify attendees field is not present when not specified
+    assert "attendees" not in request_body

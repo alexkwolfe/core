@@ -25,6 +25,7 @@ from gcal_sync.sync import CalendarEventSyncManager
 from homeassistant.components.calendar import (
     CREATE_EVENT_SCHEMA,
     ENTITY_ID_FORMAT,
+    EVENT_ATTENDEES,
     EVENT_DESCRIPTION,
     EVENT_END,
     EVENT_LOCATION,
@@ -480,6 +481,10 @@ class GoogleCalendarEntity(
             event.location = location
         if rrule := kwargs.get(EVENT_RRULE):
             event.recurrence = [f"{RRULE_PREFIX}{rrule}"]
+        if attendee_emails := kwargs.get(EVENT_ATTENDEES):
+            event.attendees = [
+                Attendee(email=email) for email in attendee_emails
+            ]
 
         try:
             await cast(
